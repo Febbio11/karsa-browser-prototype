@@ -1,0 +1,6 @@
+{
+  "name": "Karsa Browser",
+  "description": "Arsitektur, desain UI/UX interaktif, dan kode inti mobile browser Android kelas desktop berbasis Chromium kustom untuk game browser desktop & Web3.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
