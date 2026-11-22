@@ -75,12 +75,20 @@ export interface StorageKeyValue {
   value: string;
 }
 
+export interface HomeShortcut {
+  id: string;
+  label: string;
+  url: string;
+  badge: string;
+}
+
 export interface BrowserTab {
   id: string;
   title: string;
   url: string;
-  group: 'Game Web3' | 'Wallet & Sosial' | 'Utilitas';
-  type: 'game' | 'oauth-x' | 'wallet-connect' | 'oauth-discord' | 'docs' | 'devtools';
+  group: 'Utama' | 'Game Web3' | 'Wallet & Sosial' | 'Utilitas';
+  type: 'home' | 'game' | 'oauth-x' | 'wallet-connect' | 'oauth-discord' | 'docs' | 'devtools';
+  desktopMode: boolean;
   hibernated: boolean;
   incognito?: boolean;
   ramMb: number;
@@ -212,3 +220,82 @@ export interface SiteStorageItem {
   cacheMb: number;
   indexedDbMb: number;
 }
+
+export type SearchEngineId =
+  | 'google'
+  | 'brave'
+  | 'duckduckgo'
+  | 'bing'
+  | 'yandex'
+  | 'custom';
+
+export interface SearchEngineConfig {
+  id: SearchEngineId;
+  name: string;
+  shortLabel: string;
+  urlTemplate: string;
+  description: string;
+  domain: string;
+}
+
+export const DEFAULT_SEARCH_ENGINES: SearchEngineConfig[] = [
+  {
+    id: 'google',
+    name: 'Google',
+    shortLabel: 'G',
+    urlTemplate: 'https://www.google.com/search?q=%s',
+    description: 'Pencarian cepat dan hasil paling luas (Default)',
+    domain: 'google.com',
+  },
+  {
+    id: 'brave',
+    name: 'Brave Search',
+    shortLabel: 'Br',
+    urlTemplate: 'https://search.brave.com/search?q=%s',
+    description: 'Indeks independen, privat, tanpa pelacakan iklan',
+    domain: 'search.brave.com',
+  },
+  {
+    id: 'duckduckgo',
+    name: 'DuckDuckGo',
+    shortLabel: 'DDG',
+    urlTemplate: 'https://duckduckgo.com/?q=%s',
+    description: 'Fokus privasi tanpa riwayat pencarian terpersonalisasi',
+    domain: 'duckduckgo.com',
+  },
+  {
+    id: 'bing',
+    name: 'Bing',
+    shortLabel: 'B',
+    urlTemplate: 'https://www.bing.com/search?q=%s',
+    description: 'Pencarian visual dan jawaban terstruktur Microsoft',
+    domain: 'bing.com',
+  },
+  {
+    id: 'yandex',
+    name: 'Yandex',
+    shortLabel: 'Ya',
+    urlTemplate: 'https://yandex.com/search/?text=%s',
+    description: 'Kuat untuk pencarian lintas wilayah & gambar',
+    domain: 'yandex.com',
+  },
+  {
+    id: 'custom',
+    name: 'Kustom (Custom URL)',
+    shortLabel: 'URL',
+    urlTemplate: 'https://example.com/?q=%s',
+    description: 'Gunakan template URL mesin pencari Anda sendiri (%s)',
+    domain: 'custom',
+  },
+];
+
+export function buildSearchUrl(engine: SearchEngineConfig, query: string): string {
+  const encoded = encodeURIComponent(query.trim());
+  const tpl = engine.urlTemplate.trim() || 'https://www.google.com/search?q=%s';
+  if (tpl.includes('%s')) {
+    return tpl.replace(/%s/g, encoded);
+  }
+  const separator = tpl.includes('?') ? (tpl.endsWith('?') || tpl.endsWith('&') ? '' : '&') : '?q=';
+  return `${tpl}${separator}${encoded}`;
+}
+

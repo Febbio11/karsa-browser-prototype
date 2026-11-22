@@ -1125,4 +1125,417 @@ class WebAuthnPasskeyBridge(private val context: Context) {
     }
 }`,
   },
+  {
+    id: 'compose-mobile-chrome',
+    filename: 'KarsaBrowserScreen.kt',
+    path: 'app/src/main/java/id/karsa/browser/ui/KarsaBrowserScreen.kt',
+    language: 'Kotlin',
+    module: 'UI Standar Mobile v1.0.1 (Top Bar + Bottom Bar + Edge-to-Edge)',
+    summary: 'Implementasi Jetpack Compose bebas overlap dengan statusBarsPadding(), navigationBarsPadding(), 3-elemen Top Bar lega, 5-ikon Bottom Bar (Home, Bookmark, +, [N], ⋮), serta Immersive Full Screen.',
+    code: `package id.karsa.browser.ui
+
+import android.app.Activity
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.DpOffset
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowInsetsControllerCompat
+
+/**
+ * Atur kontras ikon Status Bar / Navigation Bar & mode Immersive Full Screen.
+ * Panggil enableEdgeToEdge() di MainActivity.onCreate sebelum setContent { }.
+ */
+@Composable
+fun KarsaSystemBarsEffect(
+    isDarkTheme: Boolean = isSystemInDarkTheme(),
+    isFullScreen: Boolean
+) {
+    val view = LocalView.current
+    DisposableEffect(isDarkTheme, isFullScreen) {
+        val window = (view.context as? Activity)?.window
+        if (window != null) {
+            val controller = WindowCompat.getInsetsController(window, view)
+            controller.isAppearanceLightStatusBars = !isDarkTheme
+            controller.isAppearanceLightNavigationBars = !isDarkTheme
+            controller.systemBarsBehavior =
+                WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            if (isFullScreen) {
+                controller.hide(WindowInsetsCompat.Type.systemBars())
+            } else {
+                controller.show(WindowInsetsCompat.Type.systemBars())
+            }
+        }
+        onDispose { }
+    }
+}
+
+@Composable
+fun KarsaTopBar(
+    displayUrl: String,
+    onLockClick: () -> Unit,
+    onUrlClick: () -> Unit,
+    onExtensionsClick: () -> Unit,
+    onFullScreenClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        tonalElevation = 1.dp,
+        modifier = modifier
+            .fillMaxWidth()
+            .statusBarsPadding() // Wajib: duduk rapi tepat di bawah jam, sinyal & baterai
+    ) {
+        Column {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 12.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                // 1. Kolom URL Pill Lebar (42dp, ikon gembok vektor kiri, tanpa kaca pembesar ganda)
+                Surface(
+                    shape = CircleShape,
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant),
+                    modifier = Modifier
+                        .weight(1f)
+                        .height(42.dp)
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(start = 4.dp, end = 14.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        IconButton(
+                            onClick = onLockClick,
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Rounded.Lock,
+                                contentDescription = "Info & Kontrol Situs",
+                                modifier = Modifier.size(18.dp),
+                                tint = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .fillMaxHeight()
+                                .clickable(onClick = onUrlClick),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            Text(
+                                text = displayUrl.removePrefix("https://").removePrefix("http://"),
+                                fontSize = 14.sp,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                color = MaterialTheme.colorScheme.onSurface
+                            )
+                        }
+                    }
+                }
+
+                // 2. Ikon Ekstensi / Userscript Vektor Monokrom
+                IconButton(
+                    onClick = onExtensionsClick,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Extension,
+                        contentDescription = "Ekstensi & Userscript",
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+
+                // 3. Ikon Full Layar Vektor Monokrom
+                IconButton(
+                    onClick = onFullScreenClick,
+                    modifier = Modifier.size(44.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Rounded.Fullscreen,
+                        contentDescription = "Mode Layar Penuh",
+                        modifier = Modifier.size(22.dp),
+                        tint = MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+        }
+    }
+}
+
+@Composable
+fun KarsaBottomBar(
+    tabCount: Int,
+    menuExpanded: Boolean,
+    onDismissMenu: () -> Unit,
+    onHomeClick: () -> Unit,
+    onBookmarkClick: () -> Unit,
+    onNewTabClick: () -> Unit,
+    onTabSwitcherClick: () -> Unit,
+    onMoreMenuClick: () -> Unit,
+    menuContent: @Composable ColumnScope.() -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        color = MaterialTheme.colorScheme.surface,
+        modifier = modifier
+            .fillMaxWidth()
+            .navigationBarsPadding() // Wajib: duduk rapi di atas gesture bar Android
+    ) {
+        Column {
+            HorizontalDivider(thickness = 0.5.dp, color = MaterialTheme.colorScheme.outlineVariant)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(56.dp)
+                    .padding(horizontal = 4.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // 1. Home
+                IconButton(onClick = onHomeClick, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Home,
+                        contentDescription = "Beranda",
+                        modifier = Modifier.size(22.dp)
+                    )
+                }
+
+                // 2. Bookmark (1-Tap Toggle: outline -> solid hitam/putih + floating toast)
+                IconButton(
+                    onClick = onBookmarkToggleClick,
+                    modifier = Modifier.size(48.dp)
+                ) {
+                    Icon(
+                        imageVector = if (isCurrentPageBookmarked) {
+                            Icons.Rounded.Bookmark
+                        } else {
+                            Icons.Rounded.BookmarkBorder
+                        },
+                        contentDescription = if (isCurrentPageBookmarked) "Hapus Bookmark" else "Simpan Bookmark",
+                        modifier = Modifier.size(22.dp),
+                        tint = if (isCurrentPageBookmarked) {
+                            // Hitam solid di Mode Terang, Putih solid di Mode Gelap
+                            if (isDarkTheme) Color.White else Color(0xFF141413)
+                        } else {
+                            MaterialTheme.colorScheme.onSurface
+                        }
+                    )
+                }
+
+                // 3. Tambah Tab (+) -> langsung buka tab baru ke halaman Home
+                IconButton(onClick = onNewTabClick, modifier = Modifier.size(48.dp)) {
+                    Icon(
+                        imageVector = Icons.Rounded.Add,
+                        contentDescription = "Tambah Tab Baru",
+                        modifier = Modifier.size(24.dp)
+                    )
+                }
+
+                // 4. Menu Tab ([N]) dengan bingkai RoundedCornerShape(4.dp)
+                IconButton(onClick = onTabSwitcherClick, modifier = Modifier.size(48.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .defaultMinSize(minWidth = 22.dp, minHeight = 22.dp)
+                            .clip(RoundedCornerShape(4.dp))
+                            .border(
+                                width = 1.75.dp,
+                                color = MaterialTheme.colorScheme.onSurface,
+                                shape = RoundedCornerShape(4.dp)
+                            )
+                            .padding(horizontal = 4.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (tabCount > 99) ":D" else tabCount.toString(),
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                    }
+                }
+
+                // 5. Menu Titik Tiga (⋮) dengan switch Mode Desktop di atas daftar 1 kolom
+                Box {
+                    IconButton(onClick = onMoreMenuClick, modifier = Modifier.size(48.dp)) {
+                        Icon(
+                            imageVector = Icons.Rounded.MoreVert,
+                            contentDescription = "Menu Browser",
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+                    DropdownMenu(
+                        expanded = menuExpanded,
+                        onDismissRequest = onDismissMenu,
+                        offset = DpOffset(x = (-8).dp, y = (-8).dp),
+                        modifier = Modifier
+                            .widthIn(min = 264.dp, max = 316.dp)
+                            .heightIn(max = 460.dp)
+                    ) {
+                        Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                            menuContent()
+                        }
+                    }
+                }
+            }
+        }
+    }
+}`,
+  },
+  {
+    id: 'home-mobile-ua-fresh',
+    filename: 'KarsaHomeAndUaPolicy.kt',
+    path: 'app/src/main/java/id/karsa/browser/ui/KarsaHomeAndUaPolicy.kt',
+    language: 'Kotlin',
+    module: 'Fresh State 0 Dummy, Karsa Home, Bookmark Toast & Mode Mobile/Desktop',
+    summary: 'State awal 100% bersih (1 tab Home, 0 ekstensi/history/bookmark/log), User-Agent Chrome Mobile bersih (tanpa "; wv") sebagai default, toggle Mode Desktop per tab, dan Floating Toast Bookmark.',
+    code: `package id.karsa.browser.ui
+
+import android.webkit.WebSettings
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.rounded.ChevronRight
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+
+object KarsaUserAgentPolicy {
+    // Default = Chrome Mobile bersih TANPA penanda "; wv" agar login Google & X aman
+    const val CHROME_MOBILE_CLEAN =
+        "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/131.0.6778.135 Mobile Safari/537.36"
+
+    // Aktif hanya saat pengguna menyalakan "Mode Desktop" per tab / per situs
+    const val CHROME_DESKTOP_CLEAN =
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/131.0.6778.135 Safari/537.36"
+
+    fun applyToWebSettings(settings: WebSettings, desktopMode: Boolean) {
+        settings.userAgentString = if (desktopMode) CHROME_DESKTOP_CLEAN else CHROME_MOBILE_CLEAN
+        settings.useWideViewPort = desktopMode
+        settings.loadWithOverviewMode = desktopMode
+    }
+}
+
+data class BrowserFreshState(
+    val tabs: List<TabModel> = listOf(TabModel.createHomeTab()), // 1 tab Home saja, ZERO tab dummy
+    val activeTabId: String = tabs.first().id,
+    val bookmarks: List<BookmarkModel> = emptyList(),
+    val history: List<HistoryModel> = emptyList(),
+    val downloads: List<DownloadModel> = emptyList(),
+    val extensions: List<ExtensionModel> = emptyList(),
+    val terminalLogs: List<String> = emptyList(),
+    val rememberedDesktopHosts: Set<String> = emptySet()
+)
+
+@Composable
+fun BookmarkFloatingToast(
+    visible: Boolean,
+    message: String,
+    siteBadge: String,
+    showOpenListArrow: Boolean,
+    onOpenBookmarks: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    AnimatedVisibility(visible = visible, modifier = modifier) {
+        Surface(
+            shape = RoundedCornerShape(14.dp),
+            tonalElevation = 6.dp,
+            shadowElevation = 8.dp,
+            color = MaterialTheme.colorScheme.inverseSurface,
+            contentColor = MaterialTheme.colorScheme.inverseOnSurface,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .clickable(enabled = showOpenListArrow, onClick = onOpenBookmarks)
+        ) {
+            Row(
+                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                Surface(
+                    shape = RoundedCornerShape(6.dp),
+                    color = MaterialTheme.colorScheme.inverseOnSurface.copy(alpha = 0.14f)
+                ) {
+                    Text(
+                        text = siteBadge,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier.padding(horizontal = 6.dp, vertical = 3.dp)
+                    )
+                }
+                Text(
+                    text = message,
+                    style = MaterialTheme.typography.bodyMedium,
+                    modifier = Modifier.weight(1f)
+                )
+                if (showOpenListArrow) {
+                    Icon(
+                        imageVector = Icons.Rounded.ChevronRight,
+                        contentDescription = "Buka daftar Bookmark"
+                    )
+                }
+            }
+        }
+    }
+}`,
+  },
+  {
+    id: 'android-gradle-bump',
+    filename: 'build.gradle.kts (v1.0.2)',
+    path: 'app/build.gradle.kts',
+    language: 'Kotlin',
+    module: 'Rilis APK v1.0.2 (versionCode = 3)',
+    summary: 'Konfigurasi defaultConfig terbaru untuk rilis Karsa Browser Android bersih (versionCode = 3, versionName = "1.0.2") agar GitHub Actions otomatis mem-build APK baru.',
+    code: `android {
+    namespace = "id.karsa.browser"
+    compileSdk = 35
+
+    defaultConfig {
+        applicationId = "id.karsa.browser"
+        minSdk = 26
+        targetSdk = 35
+        versionCode = 3
+        versionName = "1.0.2"
+    }
+}
+
+dependencies {
+    implementation("androidx.activity:activity-compose:1.9.3")
+    implementation("androidx.compose.material:material-icons-extended")
+}`,
+  },
 ];

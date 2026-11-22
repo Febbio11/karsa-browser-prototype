@@ -9,6 +9,7 @@ import {
   X,
   ShieldAlert,
   Smartphone,
+  Monitor,
   Check,
 } from 'lucide-react';
 import {
@@ -35,6 +36,7 @@ interface SiteInfoPopoverProps {
   antiRedirectForSite: boolean;
   walletWhitelistEnabled: boolean;
   whitelistedWallets: string[];
+  rememberDesktopForSite: boolean;
   disablePullToRefreshForSite: boolean;
   activeProfile: BrowserProfile;
   proxy: ProxyConfig;
@@ -45,6 +47,7 @@ interface SiteInfoPopoverProps {
   onToggleAntiRedirectForSite: () => void;
   onToggleWalletWhitelist: () => void;
   onToggleWhitelistedWallet: (walletName: string) => void;
+  onToggleRememberDesktopForSite: () => void;
   onTogglePullToRefreshForSite: () => void;
   onOpenProfilesSheet: () => void;
   onOpenProxyTerminal: () => void;
@@ -66,6 +69,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   antiRedirectForSite,
   walletWhitelistEnabled,
   whitelistedWallets,
+  rememberDesktopForSite,
   disablePullToRefreshForSite,
   activeProfile,
   proxy,
@@ -76,6 +80,7 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
   onToggleAntiRedirectForSite,
   onToggleWalletWhitelist,
   onToggleWhitelistedWallet,
+  onToggleRememberDesktopForSite,
   onTogglePullToRefreshForSite,
   onOpenProfilesSheet,
   onOpenProxyTerminal,
@@ -246,7 +251,26 @@ export const SiteInfoPopover: React.FC<SiteInfoPopoverProps> = ({
               )}
             </div>
 
-            {/* 3. Pull-to-Refresh */}
+            {/* 3. Ingat Mode Desktop untuk situs ini */}
+            <label className="flex min-h-[38px] items-center justify-between gap-2 rounded-lg border border-[#E5E0D6] bg-white px-3 py-2 cursor-pointer dark:border-[#34322C] dark:bg-[#191816]">
+              <div>
+                <div className="flex items-center gap-1.5">
+                  <Monitor className="h-3.5 w-3.5 shrink-0 text-[#C86442] dark:text-[#D97757]" />
+                  <p className="font-medium text-[11px]">Ingat Mode Desktop untuk situs ini</p>
+                </div>
+                <p className="text-[10px] text-[#6C675E] dark:text-[#9D978E]">
+                  Otomatis muat {origin} dalam tampilan Desktop setiap kali dibuka
+                </p>
+              </div>
+              <input
+                type="checkbox"
+                checked={rememberDesktopForSite}
+                onChange={onToggleRememberDesktopForSite}
+                className="h-4 w-4 shrink-0 accent-[#C86442]"
+              />
+            </label>
+
+            {/* 4. Pull-to-Refresh */}
             <label className="flex min-h-[38px] items-center justify-between gap-2 rounded-lg border border-[#E5E0D6] bg-white px-3 py-2 cursor-pointer dark:border-[#34322C] dark:bg-[#191816]">
               <div>
                 <p className="font-medium text-[11px]">Matikan Pull-to-Refresh</p>

@@ -357,37 +357,77 @@ export const ExtensionsPopover: React.FC<ExtensionsPopoverProps> = ({
         {/* VIEW 1: INSTALLED EXTENSIONS */}
         {view === 'installed' && (
           <div className="thin-scrollbar flex-1 overflow-y-auto p-3.5 text-xs space-y-3">
-            <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 dark:border-[#34322C] dark:bg-[#191816]">
-              <p className="text-[11px] text-[#5C5953] dark:text-[#A6A198]">
-                Pasang dari Web Store atau file lokal <code className="font-mono">.zip/.crx</code>
-              </p>
-              <button
-                type="button"
-                onClick={() => {
-                  setView('install');
-                  setInstallTab('local');
-                }}
-                className="shrink-0 rounded-md border border-[#C86442]/40 bg-[#C86442]/10 px-2 py-1 text-[10px] font-semibold text-[#964226] hover:bg-[#C86442]/20 cursor-pointer dark:border-[#D97757]/40 dark:text-[#F2A68C]"
-              >
-                + File Lokal
-              </button>
-            </div>
+            {extensions.length === 0 ? (
+              <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-[#D8D2C5] bg-white/70 px-4 py-7 text-center space-y-3 dark:border-[#383530] dark:bg-[#191816]">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-[#EFECE6] text-[#7A746B] dark:bg-[#262420] dark:text-[#9D978E]">
+                  <Puzzle className="h-5 w-5" />
+                </span>
+                <div className="space-y-1">
+                  <p className="font-medium text-[#1F1E1B] dark:text-[#F2EFE9]">
+                    Belum ada ekstensi atau userscript terinstal
+                  </p>
+                  <p className="text-[11px] text-[#6C675E] dark:text-[#9D978E]">
+                    Pasang ekstensi dari Chrome Web Store atau muat file lokal <code className="font-mono">.zip</code>, <code className="font-mono">.crx</code>, atau <code className="font-mono">.user.js</code>.
+                  </p>
+                </div>
+                <div className="flex flex-wrap items-center justify-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView('install');
+                      setInstallTab('store');
+                    }}
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg bg-[#1F1E1B] px-3.5 py-1.5 text-xs font-semibold text-[#FAF8F4] hover:bg-[#35332E] cursor-pointer dark:bg-[#D97757] dark:text-[#181715]"
+                  >
+                    <Plus className="h-3.5 w-3.5" />
+                    <span>Pasang Ekstensi</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView('install');
+                      setInstallTab('local');
+                    }}
+                    className="inline-flex min-h-[36px] items-center gap-1.5 rounded-lg border border-[#D8D2C5] bg-white px-3 py-1.5 text-xs font-medium text-[#3E3B35] hover:bg-[#EFECE6] cursor-pointer dark:border-[#3A3732] dark:bg-[#23221F] dark:text-[#DDD7CB]"
+                  >
+                    <FolderUp className="h-3.5 w-3.5" />
+                    <span>File Lokal</span>
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 dark:border-[#34322C] dark:bg-[#191816]">
+                  <p className="text-[11px] text-[#5C5953] dark:text-[#A6A198]">
+                    Pasang dari Web Store atau file lokal <code className="font-mono">.zip/.crx</code>
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setView('install');
+                      setInstallTab('local');
+                    }}
+                    className="shrink-0 rounded-md border border-[#C86442]/40 bg-[#C86442]/10 px-2 py-1 text-[10px] font-semibold text-[#964226] hover:bg-[#C86442]/20 cursor-pointer dark:border-[#D97757]/40 dark:text-[#F2A68C]"
+                  >
+                    + File Lokal
+                  </button>
+                </div>
 
-            <div className="divide-y divide-[#EAE5DC] dark:divide-[#2F2D28]">
-              {extensions.map((ext) => (
-                <div key={ext.id} className="py-2.5 first:pt-0 last:pb-0 space-y-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-medium text-[#1F1E1B] truncate dark:text-[#F2EFE9]">
-                        {ext.name}
-                      </p>
-                      <p className="text-[10px] text-[#7A746B] truncate dark:text-[#9D978E]">
-                        {ext.source} · v{ext.version} ·{' '}
-                        <span className="font-mono tabular-nums">
-                          {ext.enabled ? `${ext.ramMb} MB` : '0 MB'}
-                        </span>
-                      </p>
-                    </div>
+                <div className="divide-y divide-[#EAE5DC] dark:divide-[#2F2D28]">
+                  {extensions.map((ext) => (
+                    <div key={ext.id} className="py-2.5 first:pt-0 last:pb-0 space-y-1">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="font-medium text-[#1F1E1B] truncate dark:text-[#F2EFE9]">
+                            {ext.name}
+                          </p>
+                          <p className="text-[10px] text-[#7A746B] truncate dark:text-[#9D978E]">
+                            {ext.source} · v{ext.version} ·{' '}
+                            <span className="font-mono tabular-nums">
+                              {ext.enabled ? `${ext.ramMb} MB` : '0 MB'}
+                            </span>
+                          </p>
+                        </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
@@ -419,7 +459,9 @@ export const ExtensionsPopover: React.FC<ExtensionsPopoverProps> = ({
                   </p>
                 </div>
               ))}
-            </div>
+                </div>
+              </>
+            )}
           </div>
         )}
 
