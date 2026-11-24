@@ -30,6 +30,10 @@ import {
   Monitor,
   Check,
   Globe,
+  RotateCcw,
+  ClipboardCheck,
+  ExternalLink,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   BookmarkItem,
@@ -118,6 +122,17 @@ interface BrowserSheetsProps {
   onSelectSearchEngine: (id: SearchEngineId) => void;
   onUpdateCustomSearchEngine: (name: string, urlTemplate: string) => void;
   onToggleSearchSuggestions: () => void;
+  clipboardAutoClear: boolean;
+  onToggleClipboardAutoClear: () => void;
+  biometricAppLock: boolean;
+  onToggleBiometricAppLock: () => void;
+  flagSecureEnabled: boolean;
+  onToggleFlagSecure: () => void;
+  savedSessionCount: number;
+  onRestoreSavedSession: () => void;
+  webViewOutdated: boolean;
+  onToggleSimulateOutdatedWebView: () => void;
+  onOpenPlayStoreWebViewUpdate: () => void;
 }
 
 const PERMISSION_LABELS: { key: keyof SitePermissions; label: string }[] = [
@@ -200,6 +215,17 @@ export const BrowserSheets: React.FC<BrowserSheetsProps> = ({
   onSelectSearchEngine,
   onUpdateCustomSearchEngine,
   onToggleSearchSuggestions,
+  clipboardAutoClear,
+  onToggleClipboardAutoClear,
+  biometricAppLock,
+  onToggleBiometricAppLock,
+  flagSecureEnabled,
+  onToggleFlagSecure,
+  savedSessionCount,
+  onRestoreSavedSession,
+  webViewOutdated,
+  onToggleSimulateOutdatedWebView,
+  onOpenPlayStoreWebViewUpdate,
 }) => {
   const [profileInput, setProfileInput] = useState('');
   const [vaultUnlocked, setVaultUnlocked] = useState(false);
@@ -1015,14 +1041,66 @@ export const BrowserSheets: React.FC<BrowserSheetsProps> = ({
                 </label>
               </div>
 
-              <button
-                type="button"
-                onClick={onRunGcAndHibernate}
-                className="flex min-h-[40px] w-full items-center justify-center gap-2 rounded-lg border border-[#D8D2C5] bg-white px-3 py-2 text-xs font-medium hover:bg-[#EFECE6] cursor-pointer dark:border-[#3D3A34] dark:bg-[#191816] dark:hover:bg-[#2B2925]"
-              >
-                <Cpu className="h-3.5 w-3.5 text-[#C86442] dark:text-[#D97757]" />
-                <span>Bersihkan RAM (GC) & Hibernasi Tab</span>
-              </button>
+              {/* Hibernasi Tab Otomatis & Pemulihan Sesi (Anti-Crash) */}
+              <div className="space-y-2 border-t border-[#E7E2D8] pt-3 dark:border-[#312F2A]">
+                <p className="text-[11px] font-semibold">Stabilitas RAM &amp; Pemulihan Sesi</p>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateRender({ autoTabHibernation: !renderConfig.autoTabHibernation })
+                  }
+                  className="flex min-h-[42px] w-full items-center justify-between gap-2.5 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 text-left cursor-pointer dark:border-[#34322C] dark:bg-[#191816]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold">
+                      Hibernasi Tab Latar Belakang
+                    </span>
+                    <span className="block text-[10px] text-[#7A746B] dark:text-[#9D978E]">
+                      Bekukan tab tidak aktif otomatis agar RAM HP tetap ringan
+                    </span>
+                  </span>
+                  <TogglePill checked={renderConfig.autoTabHibernation} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    onUpdateRender({ autoSessionRestore: !renderConfig.autoSessionRestore })
+                  }
+                  className="flex min-h-[42px] w-full items-center justify-between gap-2.5 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 text-left cursor-pointer dark:border-[#34322C] dark:bg-[#191816]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold">
+                      Pemulihan Sesi Otomatis
+                    </span>
+                    <span className="block text-[10px] text-[#7A746B] dark:text-[#9D978E]">
+                      Simpan snapshot {savedSessionCount} tab lokal (anti-hilang saat HP kehabisan RAM)
+                    </span>
+                  </span>
+                  <TogglePill checked={renderConfig.autoSessionRestore} />
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <button
+                  type="button"
+                  onClick={onRunGcAndHibernate}
+                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg border border-[#D8D2C5] bg-white px-3 py-2 text-xs font-medium hover:bg-[#EFECE6] cursor-pointer dark:border-[#3D3A34] dark:bg-[#191816] dark:hover:bg-[#2B2925]"
+                >
+                  <Cpu className="h-3.5 w-3.5 text-[#C86442] dark:text-[#D97757]" />
+                  <span>Bersihkan RAM (GC) &amp; Hibernasi Tab</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onRestoreSavedSession}
+                  className="flex min-h-[38px] w-full items-center justify-center gap-2 rounded-lg border border-[#D8D2C5] bg-white px-3 py-2 text-xs font-medium hover:bg-[#EFECE6] cursor-pointer dark:border-[#3D3A34] dark:bg-[#191816] dark:hover:bg-[#2B2925]"
+                >
+                  <RotateCcw className="h-3.5 w-3.5 text-[#2E7D4F] dark:text-[#86CFA0]" />
+                  <span>Uji Pemulihan Sesi Terakhir ({savedSessionCount} tab)</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -1103,10 +1181,149 @@ export const BrowserSheets: React.FC<BrowserSheetsProps> = ({
           ================================================================= */}
           {activeSheet === 'security' && (
             <div className="p-3.5 space-y-3.5">
-              <div className="space-y-2">
-                <p className="font-semibold">Pengelola Sandi & Passkey (FIDO2)</p>
+              {/* Compact Production Security, Play Protect & OWASP MASVS Summary */}
+              <div className="rounded-xl border border-[#2E7D4F]/25 bg-[#2E7D4F]/[0.06] p-3 space-y-2 dark:border-[#86CFA0]/25 dark:bg-[#86CFA0]/[0.08]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold text-[#21633D] dark:text-[#86CFA0]">
+                    <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+                    <span>OWASP MASVS &amp; Play Protect</span>
+                  </span>
+                  <span className="font-mono text-[9.5px] font-semibold text-[#256640] dark:text-[#86CFA0]">
+                    Aktif
+                  </span>
+                </div>
+                <ul className="space-y-1.5 text-[10.5px] text-[#3E3B35] dark:text-[#D4CEC3]">
+                  <li className="flex items-center justify-between gap-2">
+                    <span>HTTPS Strict &amp; SSL Lockdown</span>
+                    <span className="font-mono text-[10px] text-[#256640] dark:text-[#86CFA0]">Aktif</span>
+                  </li>
+                  <li className="flex items-center justify-between gap-2">
+                    <span>Validasi URI Ketat (SafeUriValidator)</span>
+                    <span className="font-mono text-[10px] text-[#256640] dark:text-[#86CFA0]">Aktif</span>
+                  </li>
+                  <li className="flex items-center justify-between gap-2">
+                    <span>Jembatan Native (Per-Session Nonce)</span>
+                    <span className="font-mono text-[10px] text-[#256640] dark:text-[#86CFA0]">Terkunci</span>
+                  </li>
+                  <li className="flex items-center justify-between gap-2">
+                    <span>Android Keystore Enkripsi Lokal</span>
+                    <span className="font-mono text-[10px] text-[#256640] dark:text-[#86CFA0]">AES-256</span>
+                  </li>
+                  <li className="flex items-center justify-between gap-2">
+                    <span>R8 Log Stripping &amp; Baseline Profile</span>
+                    <span className="font-mono text-[10px] text-[#256640] dark:text-[#86CFA0]">Release</span>
+                  </li>
+                </ul>
+              </div>
+
+              {/* Pemeriksa Kesehatan Engine WebView HP (WebViewHealthChecker) */}
+              <div
+                className={`rounded-xl border p-3 space-y-2 ${
+                  webViewOutdated
+                    ? 'border-[#D97706]/45 bg-[#FEF3C7]/70 dark:border-[#F59E0B]/40 dark:bg-[#F59E0B]/12'
+                    : 'border-[#E5E0D6] bg-white dark:border-[#34322C] dark:bg-[#191816]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="flex items-center gap-1.5 text-[11px] font-semibold">
+                      {webViewOutdated ? (
+                        <AlertTriangle className="h-3.5 w-3.5 shrink-0 text-[#B45309] dark:text-[#FCD34D]" />
+                      ) : (
+                        <ShieldCheck className="h-3.5 w-3.5 shrink-0 text-[#2E7D4F] dark:text-[#86CFA0]" />
+                      )}
+                      <span>Kesehatan Engine WebView HP</span>
+                    </p>
+                    <p className="mt-0.5 font-mono text-[10px] text-[#6C675E] dark:text-[#9D978E]">
+                      Android System WebView ·{' '}
+                      <span
+                        className={
+                          webViewOutdated
+                            ? 'font-semibold text-[#B45309] dark:text-[#FCD34D]'
+                            : 'font-semibold text-[#256640] dark:text-[#86CFA0]'
+                        }
+                      >
+                        {webViewOutdated ? '114.0.5735.196 (Usang)' : '131.0.6778.135 (Mutakhir)'}
+                      </span>
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={onToggleSimulateOutdatedWebView}
+                    className="shrink-0 rounded-md border border-[#D8D2C5] bg-white/80 px-2 py-1 text-[9.5px] font-medium text-[#5C5953] hover:bg-[#EFECE6] cursor-pointer dark:border-[#3D3A34] dark:bg-[#242320] dark:text-[#C5C0B6]"
+                  >
+                    {webViewOutdated ? 'Set Mutakhir' : 'Simulasi Usang'}
+                  </button>
+                </div>
+
+                {webViewOutdated ? (
+                  <div className="space-y-2">
+                    <p className="text-[10.5px] leading-snug text-[#92400E] dark:text-[#FDE68A]">
+                      Engine WebView perangkat tertinggal dari batas aman (minimal v126). Perbarui lewat Google Play Store agar patch keamanan Chromium terbaru aktif.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onOpenPlayStoreWebViewUpdate();
+                      }}
+                      className="flex min-h-[34px] w-full items-center justify-center gap-1.5 rounded-lg bg-[#B45309] px-3 text-[11px] font-semibold text-white transition-colors hover:bg-[#92400E] cursor-pointer dark:bg-[#F59E0B] dark:text-[#1C1917]"
+                    >
+                      <ExternalLink className="h-3.5 w-3.5" />
+                      <span>Perbarui WebView di Play Store</span>
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-[10.5px] leading-snug text-[#6C675E] dark:text-[#9D978E]">
+                    Versi engine mutakhir dan telah menerima patch keamanan Chromium terbaru.
+                  </p>
+                )}
+              </div>
+
+              {/* Kunci Biometrik / PIN & FLAG_SECURE Privasi Layar */}
+              <div className="space-y-2 border-t border-[#E7E2D8] pt-3 dark:border-[#312F2A]">
+                <p className="font-semibold">Kunci Biometrik &amp; Privasi Layar</p>
+
+                <button
+                  type="button"
+                  onClick={onToggleBiometricAppLock}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-2.5 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 text-left cursor-pointer dark:border-[#34322C] dark:bg-[#191816]"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-[11px] font-semibold">
+                      Kunci Biometrik / PIN
+                    </span>
+                    <span className="block text-[10px] text-[#6C675E] dark:text-[#9D978E]">
+                      Minta sidik jari / PIN saat membuka Passkey &amp; Sandi atau Karsa Browser
+                    </span>
+                  </span>
+                  <TogglePill checked={biometricAppLock} />
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onToggleFlagSecure}
+                  className="flex min-h-[44px] w-full items-center justify-between gap-2.5 rounded-xl border border-[#E5E0D6] bg-white px-3 py-2 text-left cursor-pointer dark:border-[#34322C] dark:bg-[#191816]"
+                >
+                  <span className="min-w-0">
+                    <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+                      <span>Mode Privasi Layar</span>
+                      <span className="rounded bg-[#2E7D4F]/12 px-1 py-0.5 font-mono text-[9px] text-[#256640] dark:bg-[#86CFA0]/15 dark:text-[#86CFA0]">
+                        FLAG_SECURE
+                      </span>
+                    </span>
+                    <span className="block text-[10px] text-[#6C675E] dark:text-[#9D978E]">
+                      Aktif otomatis di tab Penyamaran &amp; Passkey/Sandi (blokir screenshot &amp; Recent Apps)
+                    </span>
+                  </span>
+                  <TogglePill checked={flagSecureEnabled} />
+                </button>
+              </div>
+
+              <div className="space-y-2 border-t border-[#E7E2D8] pt-3 dark:border-[#312F2A]">
+                <p className="font-semibold">Pengelola Sandi &amp; Passkey (FIDO2)</p>
                 <p className="text-[11px] text-[#5C5953] dark:text-[#A6A198]">
-                  Terintegrasi Android Credential Manager & kunci perangkat keras TEE/StrongBox.
+                  Terintegrasi Android Credential Manager &amp; kunci perangkat keras TEE/StrongBox.
                 </p>
                 <div className="space-y-1.5 pt-1">
                   {['Karsa Vault (Terenkripsi)', 'Bitwarden', '1Password', 'Proton Pass'].map((pm) => (
@@ -1142,8 +1359,12 @@ export const BrowserSheets: React.FC<BrowserSheetsProps> = ({
 
                 {!vaultUnlocked ? (
                   <p className="text-[11px] text-[#6C675E] dark:text-[#A6A198]">
-                    Terkunci dengan Android BiometricPrompt. Ketuk <strong>Buka Biometrik</strong> untuk melihat daftar Passkey.
+                    Terkunci dengan Android BiometricPrompt &amp; EncryptedSharedPreferences. Ketuk <strong>Buka Biometrik</strong> untuk memeriksa brankas.
                   </p>
+                ) : credentials.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-[#D8D2C5] bg-white/70 px-3 py-4 text-center text-[11px] text-[#6C675E] dark:border-[#383530] dark:bg-[#191816] dark:text-[#9D978E]">
+                    Brankas terenkripsi bersih (0 kredensial tersimpan). Sandi situs &amp; proxy yang Anda simpan akan dienkripsi lokal via Android Keystore.
+                  </div>
                 ) : (
                   <div className="divide-y divide-[#EAE5DC] rounded-xl border border-[#E5E0D6] bg-white px-3 dark:divide-[#2F2D28] dark:border-[#34322C] dark:bg-[#191816]">
                     {credentials.map((cred) => (
@@ -1299,10 +1520,47 @@ export const BrowserSheets: React.FC<BrowserSheetsProps> = ({
               SUB-MENU 7: IZIN SITUS
           ================================================================= */}
           {activeSheet === 'permissions' && (
-            <div className="p-3.5 space-y-2.5">
+            <div className="p-3.5 space-y-3">
               <p className="font-mono text-[11px] text-[#6C675E] truncate dark:text-[#9D978E]">
                 Domain: {currentOrigin}
               </p>
+
+              {/* Proteksi Clipboard (Anti-Clipboard Hijacking) */}
+              <div className="rounded-xl border border-[#E5E0D6] bg-white p-2.5 space-y-2 dark:border-[#34322C] dark:bg-[#191816]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold">
+                    <ClipboardCheck className="h-3.5 w-3.5 text-[#C86442] dark:text-[#D97757]" />
+                    <span>Proteksi Clipboard (Anti-Hijacking)</span>
+                  </span>
+                  <span
+                    className={`font-mono text-[9.5px] font-semibold ${
+                      sitePermissions.clipboard === 'block'
+                        ? 'text-[#256640] dark:text-[#86CFA0]'
+                        : 'text-[#964226] dark:text-[#E59377]'
+                    }`}
+                  >
+                    {sitePermissions.clipboard === 'block'
+                      ? 'Blokir Auto'
+                      : sitePermissions.clipboard === 'ask'
+                      ? 'Tanya'
+                      : 'Izinkan'}
+                  </span>
+                </div>
+                <p className="text-[10px] leading-snug text-[#6C675E] dark:text-[#9D978E]">
+                  Default memblokir baca papan klip otomatis tanpa izin eksplisit pengguna untuk melindungi alamat wallet &amp; kata sandi.
+                </p>
+                <button
+                  type="button"
+                  onClick={onToggleClipboardAutoClear}
+                  className="flex min-h-[36px] w-full items-center justify-between gap-2 border-t border-[#EFECE6] pt-2 text-left cursor-pointer dark:border-[#2C2A25]"
+                >
+                  <span className="text-[11px] font-medium">
+                    Auto-Clear Clipboard (30 dtk setelah salin sandi)
+                  </span>
+                  <TogglePill checked={clipboardAutoClear} />
+                </button>
+              </div>
+
               <div className="divide-y divide-[#EAE5DC] dark:divide-[#2F2D28]">
                 {PERMISSION_LABELS.map(({ key, label }) => (
                   <div key={key} className="flex items-center justify-between gap-2 py-2.5">

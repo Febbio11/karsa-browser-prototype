@@ -1,13 +1,31 @@
-import React, { useState } from 'react';
-import { Copy, Check, FileCode2 } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Copy, Check, FileCode2, ShieldCheck } from 'lucide-react';
 import { STARTER_CODE_FILES } from '../data/architectureData';
 
+type CodeFilter = 'all' | 'security' | 'core';
+
 export const CoreCodeSection: React.FC = () => {
-  const [selectedFileId, setSelectedFileId] = useState<string>(STARTER_CODE_FILES[0].id);
+  const [filter, setFilter] = useState<CodeFilter>('all');
+  const [selectedFileId, setSelectedFileId] = useState<string>('sec-manifest-xml');
   const [copied, setCopied] = useState(false);
 
+  const visibleFiles = useMemo(() => {
+    if (filter === 'security') {
+      return STARTER_CODE_FILES.filter((f) => f.category === 'security');
+    }
+    if (filter === 'core') {
+      return STARTER_CODE_FILES.filter((f) => f.category !== 'security');
+    }
+    return STARTER_CODE_FILES;
+  }, [filter]);
+
+  const securityCount = useMemo(
+    () => STARTER_CODE_FILES.filter((f) => f.category === 'security').length,
+    []
+  );
+
   const activeFile =
-    STARTER_CODE_FILES.find((f) => f.id === selectedFileId) || STARTER_CODE_FILES[0];
+    visibleFiles.find((f) => f.id === selectedFileId) || visibleFiles[0] || STARTER_CODE_FILES[0];
 
   const handleCopy = async () => {
     try {
@@ -22,24 +40,54 @@ export const CoreCodeSection: React.FC = () => {
   return (
     <section className="space-y-8">
       {/* Header */}
-      <div className="max-w-3xl space-y-2.5 border-b border-[#E5E0D6] pb-6 dark:border-[#2E2C28]">
-        <p className="text-xs font-medium text-[#8E3C21] dark:text-[#E28A6C]">
-          04. Contoh Kode Awal Komponen Inti · Kotlin, C++ (Chromium Patch) & JavaScript
-        </p>
-        <h1 className="font-editorial text-3xl font-semibold tracking-tight sm:text-4xl [text-wrap:balance]">
-          Implementasi fondasi untuk Mobile DevTools, orientasi Full Screen, multi-profil, anti-redirect, pop-up fleksibel, render control, proxy, dan Passkey.
-        </h1>
-        <p className="text-sm leading-relaxed text-[#5C5953] dark:text-[#A6A198]">
-          Seluruh modul berikut dirancang sebagai titik awal siap pakai pada struktur proyek Android Gradle + Chromium patch tree Karsa Browser.
-        </p>
+      <div className="flex flex-col gap-4 border-b border-[#E5E0D6] pb-6 lg:flex-row lg:items-end lg:justify-between dark:border-[#2E2C28]">
+        <div className="max-w-3xl space-y-2.5">
+          <p className="text-xs font-medium text-[#8E3C21] dark:text-[#E28A6C]">
+            04. Kode Inti &amp; Keamanan Produksi Android · Kotlin, XML, Gradle, ProGuard, YAML &amp; C++
+          </p>
+          <h1 className="font-editorial text-3xl font-semibold tracking-tight sm:text-4xl [text-wrap:balance]">
+            Modul siap salin untuk Keamanan Play Protect, Enkripsi Keystore, R8 Release, CI/CD, dan komponen inti browser.
+          </h1>
+          <p className="text-sm leading-relaxed text-[#5C5953] dark:text-[#A6A198]">
+            Seluruh berkas bersih dan bebas placeholder — siap langsung ditempel ke struktur repositori Android <span className="font-mono text-xs">karsa-browser-android</span>.
+          </p>
+        </div>
+
+        {/* Category Filter Tabs */}
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+          {(
+            [
+              { id: 'all', label: `Semua (${STARTER_CODE_FILES.length})` },
+              { id: 'security', label: `Keamanan & Play Protect (${securityCount})` },
+              { id: 'core', label: `UI & Engine (${STARTER_CODE_FILES.length - securityCount})` },
+            ] as const
+          ).map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => {
+                setFilter(tab.id);
+                setCopied(false);
+              }}
+              className={`rounded-lg px-3 py-1.5 text-xs font-medium transition-colors whitespace-nowrap cursor-pointer ${
+                filter === tab.id
+                  ? 'bg-[#1F1E1B] text-[#FAF8F4] dark:bg-[#D97757] dark:text-[#191816]'
+                  : 'border border-[#DDD7CB] bg-white text-[#4A4741] hover:bg-[#EFECE6] dark:border-[#34322C] dark:bg-[#22201D] dark:text-[#C5C0B6] dark:hover:bg-[#2C2A26]'
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Code Browser Workspace */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-start">
         {/* File Tree Sidebar */}
-        <aside className="lg:col-span-4 divide-y divide-[#E5E0D6] overflow-hidden rounded-xl border border-[#E5E0D6] bg-white dark:divide-[#2E2C28] dark:border-[#2E2C28] dark:bg-[#22201D]">
-          {STARTER_CODE_FILES.map((file) => {
+        <aside className="lg:col-span-4 thin-scrollbar max-h-[660px] overflow-y-auto divide-y divide-[#E5E0D6] rounded-xl border border-[#E5E0D6] bg-white dark:divide-[#2E2C28] dark:border-[#2E2C28] dark:bg-[#22201D]">
+          {visibleFiles.map((file) => {
             const active = file.id === activeFile.id;
+            const isSecurity = file.category === 'security';
             return (
               <button
                 key={file.id}
@@ -54,11 +102,19 @@ export const CoreCodeSection: React.FC = () => {
                     : 'hover:bg-[#FAF8F4] dark:hover:bg-[#272521]'
                 }`}
               >
-                <FileCode2
-                  className={`mt-0.5 h-4 w-4 shrink-0 ${
-                    active ? 'text-[#C86442] dark:text-[#D97757]' : 'text-[#8C867B]'
-                  }`}
-                />
+                {isSecurity ? (
+                  <ShieldCheck
+                    className={`mt-0.5 h-4 w-4 shrink-0 ${
+                      active ? 'text-[#2E7D4F] dark:text-[#86CFA0]' : 'text-[#5D8A6E] dark:text-[#6FA885]'
+                    }`}
+                  />
+                ) : (
+                  <FileCode2
+                    className={`mt-0.5 h-4 w-4 shrink-0 ${
+                      active ? 'text-[#C86442] dark:text-[#D97757]' : 'text-[#8C867B]'
+                    }`}
+                  />
+                )}
                 <div className="min-w-0">
                   <p className="font-mono text-xs font-semibold text-[#1F1E1B] truncate dark:text-[#F2EFE9]">
                     {file.filename}

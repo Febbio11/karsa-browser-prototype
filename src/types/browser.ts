@@ -159,6 +159,8 @@ export interface RenderConfig {
   disablePullToRefreshGlobal: boolean;
   disablePullToRefreshPerSite: boolean;
   forceDarkMode: boolean;
+  autoTabHibernation: boolean;
+  autoSessionRestore: boolean;
   translation: TranslationConfig;
 }
 

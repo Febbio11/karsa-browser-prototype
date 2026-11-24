@@ -17,8 +17,11 @@ import {
   ArrowLeft,
   ChevronRight,
   Loader2,
+  AlertTriangle,
+  BadgeCheck,
 } from 'lucide-react';
 import { FlexiblePopupState } from '../types/browser';
+import { ParsedUrlSecurity } from '../utils/urlSecurity';
 
 interface MobileWalletOption {
   name: string;
@@ -66,6 +69,8 @@ const DEMO_WC_URI =
 
 interface FlexiblePopupProps {
   popup: FlexiblePopupState;
+  requestingOrigin: string;
+  urlSecurity: ParsedUrlSecurity;
   walletWhitelistEnabled: boolean;
   whitelistedWallets: string[];
   enabledExtensionWallets: string[];
@@ -80,6 +85,8 @@ interface FlexiblePopupProps {
 
 export const FlexiblePopup: React.FC<FlexiblePopupProps> = ({
   popup,
+  requestingOrigin,
+  urlSecurity,
   walletWhitelistEnabled,
   whitelistedWallets,
   enabledExtensionWallets,
@@ -290,6 +297,25 @@ export const FlexiblePopup: React.FC<FlexiblePopupProps> = ({
 
       {/* Scrollable Body Content — Buttons never clip */}
       <div className="thin-scrollbar flex-1 overflow-y-auto p-3.5 text-xs space-y-3">
+        {/* Red Anti-Phishing / Punycode / Non-HTTPS Warning inside OAuth & Wallet Pop-up */}
+        {urlSecurity.isSuspicious && (
+          <div className="rounded-xl border-2 border-[#DC2626] bg-[#DC2626]/12 p-2.5 text-[11px] text-[#991B1B] space-y-1 dark:border-[#EF4444] dark:bg-[#EF4444]/18 dark:text-[#FECACA]">
+            <p className="flex items-center gap-1.5 font-bold">
+              <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+              <span>
+                Peringatan Phishing ({urlSecurity.shortBadge || 'BERISIKO'})
+              </span>
+            </p>
+            <p className="leading-snug">
+              Situs peminta <span className="font-mono font-bold underline">{requestingOrigin}</span>{' '}
+              {urlSecurity.isPunycode
+                ? 'menggunakan domain Punycode (xn--) / karakter Unicode mencurigakan.'
+                : 'tidak menggunakan enkripsi HTTPS.'}{' '}
+              Hindari otorisasi login atau tanda tangan wallet!
+            </p>
+          </div>
+        )}
+
         <p className="font-mono text-[11px] text-[#6C675E] dark:text-[#9D978E] truncate">
           {popup.url}
         </p>
@@ -301,7 +327,11 @@ export const FlexiblePopup: React.FC<FlexiblePopupProps> = ({
                 Pilih Metode Koneksi Wallet
               </h4>
               <p className="mt-0.5 text-[11px] text-[#5C5953] dark:text-[#A6A198]">
-                Aether Frontier meminta tanda tangan sesi (0 ETH). Pilih aplikasi wallet di HP atau ekstensi browser.
+                Domain peminta{' '}
+                <span className="font-mono font-semibold text-[#1F1E1B] dark:text-[#F2EFE9]">
+                  {requestingOrigin}
+                </span>{' '}
+                meminta tanda tangan sesi (0 ETH). Pilih aplikasi wallet resmi di HP atau ekstensi browser.
               </p>
             </div>
 
@@ -454,20 +484,49 @@ export const FlexiblePopup: React.FC<FlexiblePopupProps> = ({
               </p>
             </div>
 
-            {/* Deep-link & WalletConnect URI Preview */}
-            <div className="rounded-lg border border-[#E5E0D6] bg-white p-2.5 font-mono text-[10px] space-y-1.5 dark:border-[#383530] dark:bg-[#1A1917]">
-              <div className="flex justify-between gap-2">
-                <span className="text-[#7A746B]">Aplikasi Tujuan</span>
-                <span className="truncate">{selectedMobileWallet.packageName}</span>
-              </div>
-              <div className="flex justify-between gap-2">
-                <span className="text-[#7A746B]">Skema Deep-Link</span>
-                <span className="text-[#256640] dark:text-[#86CFA0]">
-                  {selectedMobileWallet.scheme}wc · WalletConnect v2
+            {/* Verified Official Target Package & Requesting Domain Card (Anti-Fake Wallet Intent) */}
+            <div className="rounded-xl border border-[#2E7D4F]/35 bg-[#2E7D4F]/[0.06] p-2.5 text-[10.5px] space-y-2 dark:border-[#86CFA0]/35 dark:bg-[#86CFA0]/[0.08]">
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-1.5 font-semibold text-[#21633D] dark:text-[#86CFA0]">
+                  <BadgeCheck className="h-3.5 w-3.5 shrink-0" />
+                  <span>Target Paket Resmi Terverifikasi</span>
+                </span>
+                <span className="font-mono text-[9.5px] text-[#256640] dark:text-[#86CFA0]">
+                  Anti-Fake Wallet
                 </span>
               </div>
-              <div className="rounded bg-[#F5F2EC] px-2 py-1 text-[10px] text-[#5C5953] truncate dark:bg-[#24221E] dark:text-[#A6A198]">
-                {DEMO_WC_URI}
+
+              <div className="rounded-lg border border-[#E5E0D6] bg-white p-2 font-mono text-[10px] space-y-1.5 dark:border-[#383530] dark:bg-[#1A1917]">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#7A746B]">Domain Peminta</span>
+                  <span
+                    className={`truncate font-bold ${
+                      urlSecurity.isSuspicious
+                        ? 'text-[#B91C1C] dark:text-[#FCA5A5]'
+                        : 'text-[#1F1E1B] dark:text-[#F2EFE9]'
+                    }`}
+                  >
+                    {urlSecurity.subdomain && (
+                      <span className="font-normal text-[#7A746B]">{urlSecurity.subdomain}</span>
+                    )}
+                    {urlSecurity.isInternal ? requestingOrigin : urlSecurity.primaryDomain}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#7A746B]">Paket Android Resmi</span>
+                  <span className="truncate font-semibold text-[#21633D] dark:text-[#86CFA0]">
+                    {selectedMobileWallet.packageName}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[#7A746B]">Skema Deep-Link</span>
+                  <span className="text-[#256640] dark:text-[#86CFA0]">
+                    {selectedMobileWallet.scheme}wc · Explicit Intent
+                  </span>
+                </div>
+                <div className="rounded bg-[#F5F2EC] px-2 py-1 text-[10px] text-[#5C5953] truncate dark:bg-[#24221E] dark:text-[#A6A198]">
+                  {DEMO_WC_URI}
+                </div>
               </div>
             </div>
 

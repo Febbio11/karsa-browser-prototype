@@ -30,6 +30,8 @@ import {
   ChevronRight,
   ChevronDown,
   Monitor,
+  AlertTriangle,
+  ShieldCheck,
 } from 'lucide-react';
 import {
   BookmarkItem,
@@ -70,6 +72,9 @@ import { SiteInfoPopover } from './SiteInfoPopover';
 import { ExtensionsPopover } from './ExtensionsPopover';
 import { AddressBarOverlay } from './AddressBarOverlay';
 import { SearchEngineBadge } from './SearchEngineBadge';
+import { parseUrlSecurity, validateSafeUri } from '../utils/urlSecurity';
+
+const SESSION_STORAGE_KEY = 'karsa_saved_session_tabs_v1';
 
 interface BrowserSimulatorProps {
   isDark: boolean;
@@ -110,7 +115,7 @@ const INITIAL_PROFILES: BrowserProfile[] = [
 const INITIAL_CREDENTIALS: VaultCredential[] = [];
 
 const INITIAL_PERMISSIONS: SitePermissions = {
-  clipboard: 'allow',
+  clipboard: 'block',
   notifications: 'ask',
   camera: 'block',
   microphone: 'block',
@@ -180,6 +185,8 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
     disablePullToRefreshGlobal: true,
     disablePullToRefreshPerSite: true,
     forceDarkMode: false,
+    autoTabHibernation: true,
+    autoSessionRestore: true,
     translation: {
       enabled: false,
       sourceLang: 'auto',
@@ -259,6 +266,11 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
   const [downloads, setDownloads] = useState<DownloadItem[]>([]);
   const [siteStorage, setSiteStorage] = useState<SiteStorageItem[]>([]);
   const [sitePermissions, setSitePermissions] = useState<SitePermissions>(INITIAL_PERMISSIONS);
+  const [clipboardAutoClear, setClipboardAutoClear] = useState(true);
+  const [biometricAppLock, setBiometricAppLock] = useState(true);
+  const [flagSecureEnabled, setFlagSecureEnabled] = useState(true);
+  const [webViewOutdated, setWebViewOutdated] = useState(false);
+  const [savedSessionCount, setSavedSessionCount] = useState<number>(1);
   const [findBarOpen, setFindBarOpen] = useState(false);
   const [findQuery, setFindQuery] = useState('');
 
@@ -290,6 +302,11 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
       return activeTab.url;
     }
   }, [activeTab.url, activeTab.type]);
+
+  const urlSecurity = useMemo(() => parseUrlSecurity(activeTab.url), [activeTab.url]);
+  const isFlagSecureActive =
+    flagSecureEnabled && (Boolean(activeTab.incognito) || activeSheet === 'security');
+
   const currentSavedZoom = savedSiteZooms[currentOrigin] ?? 100;
 
   const totalRamMb = useMemo(() => {
@@ -329,6 +346,26 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
       }, 10);
     }
   }, [urlFocusMode]);
+
+  // Persist non-incognito tabs snapshot locally whenever Auto Session Restore is active
+  useEffect(() => {
+    if (!renderConfig.autoSessionRestore) return;
+    const persistable = tabs.filter((t) => !t.incognito && t.type !== 'devtools');
+    if (persistable.length === 0) return;
+    try {
+      window.localStorage.setItem(
+        SESSION_STORAGE_KEY,
+        JSON.stringify({
+          savedAt: Date.now(),
+          activeTabId,
+          tabs: persistable,
+        })
+      );
+      setSavedSessionCount(persistable.length);
+    } catch {
+      // Ignore storage quota errors inside sandboxed iframes
+    }
+  }, [tabs, activeTabId, renderConfig.autoSessionRestore]);
 
   const handleEnterUrlFocus = (openEnginePicker = false) => {
     setSiteInfoOpen(false);
@@ -450,6 +487,25 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
     const trimmed = rawInput.trim();
     if (!trimmed) {
       handleCancelUrlFocus();
+      return;
+    }
+
+    // OWASP MASVS SafeUriValidator: block file://, content://, javascript:, unknown intent://
+    const uriDecision = validateSafeUri(trimmed);
+    if (uriDecision.status === 'block') {
+      setUrlFocusMode(false);
+      setEnginePickerOpen(false);
+      setSearchDraft('');
+      showNotice(uriDecision.reason);
+      appendLog('error', `[SafeUriValidator] Diblokir (${uriDecision.scheme}): ${trimmed}`);
+      return;
+    }
+    if (uriDecision.status === 'wallet-confirm') {
+      setUrlFocusMode(false);
+      setEnginePickerOpen(false);
+      setSearchDraft('');
+      openFlexiblePopup('wallet');
+      appendLog('output', `[SafeUriValidator] Skema wallet resmi (${uriDecision.scheme}) dialihkan ke dialog konfirmasi.`);
       return;
     }
 
@@ -921,9 +977,15 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
 
   const handleSelectTab = (tab: BrowserTab) => {
     setTabs((prev) =>
-      prev.map((t) =>
-        t.id === tab.id ? { ...t, hibernated: false, ramMb: t.ramMb < 40 ? 96 : t.ramMb } : t
-      )
+      prev.map((t) => {
+        if (t.id === tab.id) {
+          return { ...t, hibernated: false, ramMb: t.ramMb < 40 ? 96 : t.ramMb };
+        }
+        if (renderConfig.autoTabHibernation) {
+          return { ...t, hibernated: true, ramMb: 16 };
+        }
+        return t;
+      })
     );
     setActiveTabId(tab.id);
     setAddressInput(tab.url);
@@ -947,9 +1009,46 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
   const handleAddTab = (incognito = false) => {
     const id = `tab-${Date.now()}`;
     const newTab = createHomeTab(id, incognito);
-    setTabs((prev) => [...prev, newTab]);
+    setTabs((prev) => [
+      ...prev.map((t) =>
+        renderConfig.autoTabHibernation ? { ...t, hibernated: true, ramMb: 16 } : t
+      ),
+      newTab,
+    ]);
     setActiveTabId(id);
     setAddressInput(newTab.url);
+    if (incognito && flagSecureEnabled) {
+      showNotice('Tab Penyamaran dibuka dengan Mode Privasi Layar (FLAG_SECURE) aktif.');
+    }
+  };
+
+  const handleRestoreSavedSession = () => {
+    try {
+      const raw = window.localStorage.getItem(SESSION_STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as { tabs?: BrowserTab[]; activeTabId?: string };
+        if (Array.isArray(parsed.tabs) && parsed.tabs.length > 0) {
+          const restored = parsed.tabs.map((t, idx) => ({
+            ...t,
+            hibernated: renderConfig.autoTabHibernation && idx !== 0,
+            ramMb: renderConfig.autoTabHibernation && idx !== 0 ? 16 : t.ramMb,
+          }));
+          setTabs(restored);
+          const target = restored.find((t) => t.id === parsed.activeTabId) || restored[0];
+          setActiveTabId(target.id);
+          setAddressInput(target.url);
+          showNotice(`Sesi dipulihkan: ${restored.length} tab dimuat kembali tanpa kehilangan halaman.`);
+          appendLog(
+            'success',
+            `[TabLifecycle] Pemulihan sesi lokal selesai (${restored.length} tab dipulihkan dari snapshot).`
+          );
+          return;
+        }
+      }
+    } catch {
+      // Fallback safely
+    }
+    showNotice('Snapshot sesi lokal sudah tersinkron dengan tab aktif saat ini.');
   };
 
   const handleSelectProfile = (profileId: string) => {
@@ -1273,7 +1372,18 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
             {/* Android System Status Bar (Edge-to-Edge Safe Area, Hidden in Full Screen) */}
             {!fullScreen && (
               <div className="flex h-7 shrink-0 items-center justify-between bg-[#FAF8F4] px-4 text-[11px] font-mono font-medium text-[#1F1E1B] select-none dark:bg-[#21201D] dark:text-[#F2EFE9]">
-                <span className="tabular-nums">23:45 · {activeProfile.badge}</span>
+                <span className="flex items-center gap-1.5 tabular-nums">
+                  <span>23:45 · {activeProfile.badge}</span>
+                  {isFlagSecureActive && (
+                    <span
+                      title="Mode Privasi Layar (FLAG_SECURE) aktif: screenshot & pratinjau Recent Apps diblokir"
+                      className="inline-flex items-center gap-0.5 rounded bg-[#2E7D4F]/15 px-1.5 py-0.5 text-[9px] font-semibold text-[#21633D] dark:bg-[#86CFA0]/20 dark:text-[#86CFA0]"
+                    >
+                      <ShieldCheck className="h-2.5 w-2.5" />
+                      <span>FLAG_SECURE</span>
+                    </span>
+                  )}
+                </span>
                 <div className="flex items-center gap-2.5 tabular-nums opacity-85">
                   {proxy.enabled && (
                     <span className="text-[#2E7D4F] dark:text-[#86CFA0]">
@@ -1388,7 +1498,13 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                 ) : (
                   /* STANDARD 3-ELEMENT MOBILE TOP BAR: [Wide URL Pill (Vector Lock)] -> [Vector Extensions] -> [Vector Full Screen] */
                   <>
-                    <div className="flex h-[42px] flex-1 min-w-0 items-center gap-1.5 rounded-full border border-[#DFD9CE] bg-white pl-1.5 pr-3.5 shadow-[0_1px_2px_rgba(0,0,0,0.03)] dark:border-[#36342E] dark:bg-[#171614]">
+                    <div
+                      className={`flex h-[42px] flex-1 min-w-0 items-center gap-1.5 rounded-full border pl-1.5 pr-3 shadow-[0_1px_2px_rgba(0,0,0,0.03)] transition-colors ${
+                        urlSecurity.isSuspicious
+                          ? 'border-[#DC2626] bg-[#FEF2F2] dark:border-[#EF4444] dark:bg-[#2A1616]'
+                          : 'border-[#DFD9CE] bg-white dark:border-[#36342E] dark:bg-[#171614]'
+                      }`}
+                    >
                       <button
                         type="button"
                         onClick={() => {
@@ -1397,31 +1513,68 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                           setActiveSheet(null);
                           setSiteInfoOpen((v) => !v);
                         }}
-                        title="Info & Kontrol Situs (HTTPS, Cache, Izin & Proteksi)"
+                        title={
+                          urlSecurity.isSuspicious
+                            ? `Peringatan Keamanan (${urlSecurity.shortBadge}): ketuk untuk detail`
+                            : 'Info & Kontrol Situs (HTTPS, Cache, Izin & Proteksi)'
+                        }
                         aria-label="Info dan kontrol situs"
                         aria-expanded={siteInfoOpen}
                         className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full transition-colors cursor-pointer ${
-                          siteInfoOpen
+                          urlSecurity.isSuspicious
+                            ? 'bg-[#DC2626]/15 text-[#B91C1C] dark:bg-[#EF4444]/25 dark:text-[#FCA5A5]'
+                            : siteInfoOpen
                             ? 'bg-[#2E7D4F]/18 text-[#21633D] ring-1 ring-[#2E7D4F]/40 dark:bg-[#86CFA0]/20 dark:text-[#86CFA0] dark:ring-[#86CFA0]/40'
                             : 'text-[#4A4741] hover:bg-black/5 dark:text-[#D4CEC3] dark:hover:bg-white/10'
                         }`}
                       >
-                        <Lock className="h-4 w-4" />
+                        {urlSecurity.isSuspicious ? (
+                          <AlertTriangle className="h-4 w-4" />
+                        ) : (
+                          <Lock className="h-4 w-4" />
+                        )}
                       </button>
                       <button
                         type="button"
                         onClick={() => handleEnterUrlFocus(false)}
                         title="Ketuk untuk mencari atau menempel URL baru"
                         aria-label="Buka kolom pencarian dan alamat URL"
-                        className={`min-w-0 flex-1 py-1 text-left text-[13.5px] truncate cursor-text ${
-                          isHomeTab
-                            ? 'font-normal text-[#8A8479] dark:text-[#868075]'
-                            : 'font-medium text-[#1F1E1B] dark:text-[#EFECE6]'
-                        }`}
+                        className="flex min-w-0 flex-1 items-center gap-1.5 py-1 text-left text-[13.5px] cursor-text overflow-hidden"
                       >
-                        {isHomeTab
-                          ? `Telusuri ${activeSearchEngine.name} atau ketik URL`
-                          : (addressInput || activeTab.url).replace(/^https?:\/\//, '')}
+                        {isHomeTab ? (
+                          <span className="truncate font-normal text-[#8A8479] dark:text-[#868075]">
+                            Telusuri {activeSearchEngine.name} atau ketik URL
+                          </span>
+                        ) : (
+                          <>
+                            <span className="min-w-0 flex-1 truncate">
+                              {urlSecurity.subdomain && (
+                                <span className="font-normal text-[#8E887E] dark:text-[#7D776E]">
+                                  {urlSecurity.subdomain}
+                                </span>
+                              )}
+                              <span
+                                className={`font-bold ${
+                                  urlSecurity.isSuspicious
+                                    ? 'text-[#B91C1C] dark:text-[#FCA5A5]'
+                                    : 'text-[#141413] dark:text-[#FAF8F4]'
+                                }`}
+                              >
+                                {urlSecurity.primaryDomain}
+                              </span>
+                              {urlSecurity.rest && (
+                                <span className="font-normal text-[#8E887E] dark:text-[#7D776E]">
+                                  {urlSecurity.rest}
+                                </span>
+                              )}
+                            </span>
+                            {urlSecurity.isSuspicious && urlSecurity.shortBadge && (
+                              <span className="shrink-0 rounded bg-[#DC2626] px-1.5 py-0.5 font-mono text-[9px] font-bold text-white dark:bg-[#EF4444]">
+                                {urlSecurity.shortBadge}
+                              </span>
+                            )}
+                          </>
+                        )}
                       </button>
                     </div>
 
@@ -1907,6 +2060,8 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                 {/* Flexible Resizable & Draggable Pop-up Overlay */}
                 <FlexiblePopup
                   popup={popup}
+                  requestingOrigin={currentOrigin}
+                  urlSecurity={urlSecurity}
                   walletWhitelistEnabled={walletWhitelistEnabled}
                   whitelistedWallets={whitelistedWallets}
                   enabledExtensionWallets={enabledExtensionWallets}
@@ -2027,8 +2182,11 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                 open={siteInfoOpen && !fullScreen}
                 url={activeTab.url}
                 origin={currentOrigin}
+                urlSecurity={urlSecurity}
                 siteStorageItem={siteStorage.find((s) => s.origin === currentOrigin)}
                 sitePermissions={sitePermissions}
+                clipboardAutoClear={clipboardAutoClear}
+                webViewOutdated={webViewOutdated}
                 antiRedirectForSite={antiRedirectForSite}
                 walletWhitelistEnabled={walletWhitelistEnabled}
                 whitelistedWallets={whitelistedWallets}
@@ -2037,6 +2195,26 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                 activeProfile={activeProfile}
                 proxy={proxy}
                 onClose={() => setSiteInfoOpen(false)}
+                onOpenPlayStoreWebViewUpdate={() => {
+                  handleNavigateActiveTab(
+                    'https://play.google.com/store/apps/details?id=com.google.android.webview',
+                    'Android System WebView — Google Play'
+                  );
+                  showNotice('Membuka halaman pembaruan Android System WebView di Google Play Store.');
+                  appendLog('output', '[WebViewHealthChecker] Membuka Play Store -> com.google.android.webview');
+                }}
+                onToggleClipboardAutoClear={() =>
+                  setClipboardAutoClear((v) => {
+                    const next = !v;
+                    showNotice(
+                      next
+                        ? 'Auto-Clear Clipboard aktif (bersih otomatis 30 dtk setelah salin sandi).'
+                        : 'Auto-Clear Clipboard dimatikan.'
+                    );
+                    appendLog('output', `[ClipboardGuard] Auto-Clear 30s -> ${next ? 'AKTIF' : 'NONAKTIF'}`);
+                    return next;
+                  })
+                }
                 onToggleRememberDesktopForSite={() => {
                   if (isHomeTab) return;
                   const next = !rememberDesktopSites[currentOrigin];
@@ -2270,6 +2448,67 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                     return next;
                   })
                 }
+                clipboardAutoClear={clipboardAutoClear}
+                onToggleClipboardAutoClear={() =>
+                  setClipboardAutoClear((v) => {
+                    const next = !v;
+                    showNotice(
+                      next
+                        ? 'Auto-Clear Clipboard (30 dtk) diaktifkan.'
+                        : 'Auto-Clear Clipboard dimatikan.'
+                    );
+                    appendLog('output', `[ClipboardGuard] Auto-Clear 30s -> ${next ? 'AKTIF' : 'NONAKTIF'}`);
+                    return next;
+                  })
+                }
+                biometricAppLock={biometricAppLock}
+                onToggleBiometricAppLock={() =>
+                  setBiometricAppLock((v) => {
+                    const next = !v;
+                    showNotice(
+                      next
+                        ? 'Kunci Biometrik / PIN aktif untuk Passkey & Sandi.'
+                        : 'Kunci Biometrik / PIN dinonaktifkan.'
+                    );
+                    appendLog('output', `[BiometricLock] Kunci Biometrik/PIN -> ${next ? 'AKTIF' : 'NONAKTIF'}`);
+                    return next;
+                  })
+                }
+                flagSecureEnabled={flagSecureEnabled}
+                onToggleFlagSecure={() =>
+                  setFlagSecureEnabled((v) => {
+                    const next = !v;
+                    showNotice(
+                      next
+                        ? 'Mode Privasi Layar (FLAG_SECURE) aktif pada Penyamaran & Passkey/Sandi.'
+                        : 'Mode Privasi Layar (FLAG_SECURE) dimatikan.'
+                    );
+                    appendLog('output', `[PrivacyScreen] FLAG_SECURE -> ${next ? 'AKTIF' : 'NONAKTIF'}`);
+                    return next;
+                  })
+                }
+                savedSessionCount={savedSessionCount}
+                onRestoreSavedSession={handleRestoreSavedSession}
+                webViewOutdated={webViewOutdated}
+                onToggleSimulateOutdatedWebView={() =>
+                  setWebViewOutdated((v) => {
+                    const next = !v;
+                    showNotice(
+                      next
+                        ? 'Simulasi aktif: Android System WebView v114 terdeteksi usang.'
+                        : 'Status engine dikembalikan ke Android System WebView v131 (Mutakhir).'
+                    );
+                    return next;
+                  })
+                }
+                onOpenPlayStoreWebViewUpdate={() => {
+                  handleNavigateActiveTab(
+                    'https://play.google.com/store/apps/details?id=com.google.android.webview',
+                    'Android System WebView — Google Play'
+                  );
+                  showNotice('Membuka halaman pembaruan Android System WebView di Google Play Store.');
+                  appendLog('output', '[WebViewHealthChecker] Membuka Play Store -> com.google.android.webview');
+                }}
               />
             </div>
 
@@ -2517,8 +2756,20 @@ export const BrowserSimulator: React.FC<BrowserSimulatorProps> = ({ isDark, onTo
                 }}
                 className="flex w-full items-center justify-between rounded-lg border border-[#E5E0D6] px-3 py-2.5 text-left text-xs font-medium transition-colors hover:border-[#C86442] hover:bg-[#FAF8F4] cursor-pointer dark:border-[#34322C] dark:hover:border-[#D97757] dark:hover:bg-[#2A2824]"
               >
-                <span>Brankas Passkey & Sandi</span>
+                <span>Brankas Passkey, Biometrik &amp; FLAG_SECURE</span>
                 <KeyRound className="h-3.5 w-3.5 text-[#C86442] dark:text-[#D97757]" />
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleNavigateActiveTab('https://app.xn--rbby-43a.io/connect?ref=airdrop', 'Situs Tiruan (Uji Punycode)');
+                  showNotice('Deteksi Anti-Phishing aktif: domain Punycode (xn--) ditandai merah di URL Bar & Pop-up.');
+                }}
+                className="flex w-full items-center justify-between rounded-lg border border-[#DC2626]/35 bg-[#DC2626]/[0.05] px-3 py-2.5 text-left text-xs font-medium text-[#991B1B] transition-colors hover:border-[#DC2626] cursor-pointer dark:border-[#EF4444]/40 dark:bg-[#EF4444]/10 dark:text-[#FCA5A5]"
+              >
+                <span>Uji Anti-Phishing (Domain Punycode)</span>
+                <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
               </button>
             </div>
           </div>

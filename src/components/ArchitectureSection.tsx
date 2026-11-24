@@ -102,7 +102,7 @@ export const ArchitectureSection: React.FC = () => {
       <div className="space-y-5 pt-2">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <h2 className="font-editorial text-2xl font-semibold">Alur Kerja 6 Mekanisme Kritikal</h2>
+            <h2 className="font-editorial text-2xl font-semibold">Alur Kerja 7 Mekanisme Kritikal</h2>
             <p className="text-sm text-[#5C5953] dark:text-[#A6A198]">
               Pilih mekanisme untuk melihat urutan eksekusi dari pemicu hingga hasil di perangkat Android.
             </p>
@@ -130,6 +130,7 @@ export const ArchitectureSection: React.FC = () => {
                 {wf.id === 'flexible-popup' && 'Pop-up Fleksibel & Reparenting'}
                 {wf.id === 'terminal-proxy' && 'Terminal, CDP & Proxy'}
                 {wf.id === 'render-fps' && 'Kontrol Render & FPS'}
+                {wf.id === 'play-protect-security' && 'Keamanan & Play Protect'}
               </button>
             );
           })}
